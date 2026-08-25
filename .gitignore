@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+doc/*.npy
+doc/world.json
+
+# Camera-derived imagery. This repo is PUBLIC and these are frames of a
+# family living space -- the phone reference photo, the temporal median,
+# and every overlay drawn on top of one. They stay on the node that made
+# them. doc/map.png is kept: it is a rendered top-down map with no camera
+# content in it at all.
+doc/TINA_ENV_1.JPG
+doc/camera_annotated.png
+doc/median.png
+doc/floor_candidates.png
+doc/floor_quad.png
+doc/stability.png
+
+# Detector weights. yolov8n.onnx is exported from Ultralytics, whose code
+# is AGPL-3.0 and whose weight licensing this project has never resolved.
+# Redistributing them from a public GPL-3.0 repo would answer that question
+# by accident. Fetch them locally instead -- see doc/README.md.
+cv/models/*.onnx
