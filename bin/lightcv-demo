@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Build tina's map the way the editor would, and exercise it end to end.
+
+The floor quad here is TRACED, not inferred -- see the report and the README
+for why the automatic route failed on this camera. These are the numbers a
+PM would produce in ~2 minutes in the editor, entered here so the rest of
+the pipeline can be demonstrated and measured without waiting on a browser
+session.
+
+Everything downstream of the quad is real: the homography, the projection,
+the sector/height logic, the render, and the cost.
+"""
+
+import json
+import os
+import sys
+import time
+
+import numpy as np
+import cv2
+
+_R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _R)
+
+from lightcv.world import World, Sector          # noqa: E402
+from lightcv.floor import FloorPlane             # noqa: E402
+from lightcv.render import MapRenderer, RenderCache  # noqa: E402
+from lightcv.observe import Observer             # noqa: E402
+
+OUT = os.path.join(_R, 'doc')
+
+# --- traced floor: the wooden patch around the side table -----------------
+# near-left, near-right, far-right, far-left, in tina's image pixels.
+FLOOR_IMG = [(392, 352), (928, 330), (846, 150), (474, 156)]
+FLOOR_CM = [(0, 0), (170, 0), (170, 130), (0, 130)]   # asserted room metres
+CAM_H_CM = 82.0
+CAM_XY = (85.0, -95.0)      # camera ground position, in map cm
+
+
+def main():
+    w = World(path=os.path.join(OUT, 'world.json'))
+    fp = FloorPlane.from_correspondences(FLOOR_IMG, FLOOR_CM,
+                                         camera_height_cm=CAM_H_CM,
+                                         camera_map_xy=CAM_XY)
+    w.homography = fp.H.tolist()
+    w.homography_quality = fp.quality
+    print('floor homography quality:')
+    for k, v in fp.quality.items():
+        print(f'   {k}: {v}')
+    print(f'   height correction available: {fp.can_correct_height()}')
+
+    w.add_sector(Sector(FLOOR_CM, 0.0, 'floor', source='confirmed',
+                        confidence=1.0, locked=True))
+    # The couch, from the reference photo's 0.709 detection, sized and placed
+    # in map cm. Height from the asserted default table.
+    w.add_sector(Sector([(-60, -125), (160, -125), (160, -4), (-60, -4)],
+                        40.0, 'couch', source='proposed', confidence=0.709))
+    w.add_sector(Sector([(52, 40), (108, 40), (108, 92), (52, 92)],
+                        45.0, 'side table', source='proposed', confidence=0.30))
+    w.add_sector(Sector([(120, 96), (168, 96), (168, 130), (120, 130)],
+                        0.0, 'potted plant', source='proposed',
+                        confidence=0.723))
+
+    obs = Observer(w, fp, min_evidence=0.30, semantic_floor=0.25)
+
+    class T:
+        def __init__(s, cls, box, ev, conf):
+            s.cls, s.box, s.evidence, s.confidence = cls, box, ev, conf
+            s.state = 'present'
+
+    print('\n--- observations ---')
+    # a cat standing on the floor, contact point on the wooden patch
+    t1 = T('cat', (610, 275, 80, 55), 0.9, 0.43)
+    print('cat on floor      ->', 'changed' if obs.observe_track(t1) else 'no change')
+    # the same apparent size, contact point up on the couch
+    t2 = T('cat', (300, 470, 110, 70), 0.9, 0.43)
+    print('cat on couch      ->', 'changed' if obs.observe_track(t2) else 'no change')
+
+    for th in w.things.values():
+        s = w.sectors.get(th.sector_id)
+        print(f'   {th.kind:<8} at ({th.x:7.1f}, {th.y:7.1f})  '
+              f'on {(s.label if s else "-- off map --"):<12} '
+              f'floor {(s.floor_height if s else 0):.0f}cm')
+
+    print('\n--- the inversion: map is state ---')
+    r = w.revision
+    for _ in range(50):
+        obs.observe_track(t1)
+    print(f'   50 repeat observations of a still cat -> revision {r} -> {w.revision}')
+    print('   (a still world writes nothing, so nothing redraws)')
+
+    rc = RenderCache(MapRenderer(1000, 700))
+    img = rc.frame_for(w)
+    for _ in range(500):
+        rc.frame_for(w)
+    print(f'   500 render requests -> {rc.renders} actual render(s), '
+          f'{rc.hits} cache hits')
+
+    ts = []
+    for _ in range(40):
+        a = time.perf_counter()
+        rc.frame_for(w, force=True)
+        ts.append((time.perf_counter() - a) * 1000)
+    print(f'\n--- cost on tina ---')
+    print(f'   map render:  mean {np.mean(ts):6.2f} ms   max {np.max(ts):6.2f} ms')
+    print(f'   amortised at 1 change/s over an 8fps feed: '
+          f'{np.mean(ts)/8:.2f} ms per displayed frame')
+
+    cv2.imwrite(os.path.join(OUT, 'map.png'),
+                cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    w.save()
+    print(f'\nwrote doc/map.png and doc/world.json '
+          f'({len(w.sectors)} sectors, {len(w.things)} things)')
+
+    # what the camera saw, with the traced floor and the two contact points
+    med = cv2.imread(os.path.join(OUT, 'median.png'))
+    if med is not None:
+        cv2.polylines(med, [np.array(FLOOR_IMG, np.int32)], True, (80, 220, 90), 3)
+        for lbl, b in (('floor', (610, 275, 80, 55)), ('couch', (300, 470, 110, 70))):
+            x, y, bw, bh = b
+            cv2.rectangle(med, (x, y), (x + bw, y + bh), (70, 180, 250), 2)
+            cv2.circle(med, (x + bw // 2, y + bh), 7, (70, 120, 250), -1)
+            cv2.putText(med, f'cat/{lbl}', (x, y - 8),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (70, 180, 250), 2)
+        cv2.imwrite(os.path.join(OUT, 'camera_annotated.png'), med)
+        print('wrote doc/camera_annotated.png')
+
+
+if __name__ == '__main__':
+    main()

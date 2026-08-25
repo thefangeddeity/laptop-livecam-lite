@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""Build a map PROPOSAL for tina from evidence already collected.
+
+Everything this emits is a proposal. Sectors are written with
+source='proposed', the renderer draws them dashed with a '?', and the editor
+exists so the PM can correct them in about two minutes. Nothing here should
+be mistaken for a measurement.
+"""
+
+import json
+import os
+import sys
+import time
+
+import numpy as np
+import cv2
+
+_R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _R)
+sys.path.insert(0, os.path.join(_R, 'cv'))
+
+from lightcv.propose import (floor_candidates_from_colour,          # noqa: E402
+                             furniture_from_reference, region_outline)
+from lightcv.world import World, Sector, DEFAULT_FLOOR_HEIGHT_CM     # noqa: E402
+from lightcv.floor import FloorPlane                                 # noqa: E402
+from lightcv.render import MapRenderer                               # noqa: E402
+
+RAW = os.environ.get('LIGHTCV_RAW', os.path.expanduser('~/lightcv_cap/tina_raw.rgb'))
+REF = os.environ.get('LIGHTCV_REF', os.path.join(_R, 'doc', 'TINA_ENV_1.JPG'))
+OUT = os.path.join(_R, 'doc')
+W, H = 1280, 720
+
+
+def main():
+    import cv_occupancy as occ
+    import cv_detect as cvd
+
+    fr = np.memmap(RAW, dtype=np.uint8, mode='r').reshape(-1, H, W, 3)
+    frames = [np.ascontiguousarray(fr[i]) for i in range(0, len(fr), 3)]
+    print(f'frames: {len(fr)}  sampled: {len(frames)}')
+
+    med = occ.temporal_median(frames)
+    cv2.imwrite(os.path.join(OUT, 'median.png'),
+                cv2.cvtColor(med, cv2.COLOR_RGB2BGR))
+
+    # --- real cat detections in this window, at tina's live config -------
+    det = cvd.OnnxDetector(os.path.join(_R, 'cv', 'models', 'yolov8n.onnx'),
+                           conf=0.05,
+                           classes=cvd.parse_class_filter('cat')).load()
+    hits = []
+    for i in range(0, len(fr), 2):
+        for x in det.detect(np.ascontiguousarray(fr[i])):
+            hits.append({'frame': i, 'conf': round(x.confidence, 3),
+                         'box': [x.x, x.y, x.w, x.h]})
+    hits.sort(key=lambda h: -h['conf'])
+    print(f'\nreal CAT detections in the captured window: {len(hits)}')
+    for h in hits[:6]:
+        print(f'   frame {h["frame"]:>3}  conf {h["conf"]:.3f}  box {h["box"]}')
+    json.dump(hits, open(os.path.join(OUT, 'cat_hits.json'), 'w'), indent=1)
+
+    # --- furniture, from the reference photo -----------------------------
+    furn, ref_shape = furniture_from_reference(REF, conf=0.20)
+    print(f'\nreference photo {os.path.basename(REF)} '
+          f'({ref_shape[1]}x{ref_shape[0]}) -> {len(furn)} static objects')
+    for f in sorted(furn, key=lambda z: -z['conf']):
+        print(f'   {f["label"]:<14} {f["conf"]:.3f}  {f["box"]}')
+
+    # --- floor candidates -------------------------------------------------
+    cands = floor_candidates_from_colour(
+        med, furniture_boxes=[f['box'] for f in furn])
+    print(f'\nfloor candidates, ranked (colour coherence): {len(cands)}')
+    for i, c in enumerate(cands):
+        q = [[int(a), int(b)] for a, b in c['quad']]
+        print(f'   cand{i}  area {c["area_frac"]:.3f}  cy {c["centroid_y_frac"]:.2f}'
+              f'  luma {c["mean_luma"]}  furn_overlap {c["furniture_overlap"]:.2f}')
+        print(f'          quad {q}')
+    json.dump(cands, open(os.path.join(OUT, 'floor_candidates.json'), 'w'),
+              indent=1)
+
+    vis = med.copy()
+    cols = [(0, 255, 0), (255, 180, 0), (0, 180, 255), (255, 0, 180)]
+    for i, c in enumerate(cands):
+        cv2.polylines(vis, [np.array(c['quad'], np.int32)], True,
+                      cols[i % 4], 3)
+        cv2.putText(vis, f'cand{i}', tuple(map(int, c['quad'][0])),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, cols[i % 4], 2)
+    cv2.imwrite(os.path.join(OUT, 'floor_candidates.png'),
+                cv2.cvtColor(vis, cv2.COLOR_RGB2BGR))
+    print('\nwrote doc/floor_candidates.png doc/median.png')
+    return cands, furn, hits, med
+
+
+if __name__ == '__main__':
+    main()
