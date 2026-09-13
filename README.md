@@ -1,6 +1,6 @@
-# hls-lightcv-server
+# laptop-livecam-lite
 
-A fork of `hls-livecam-server` that stops trying to make a degraded camera
+A fork of `laptop-livecam` that stops trying to make a degraded camera
 produce a good picture, and instead uses it to maintain a **map**.
 
 Runs on tina only. No packaging, no versioning, no AUR, no deb. If this goes
@@ -12,11 +12,11 @@ The entire observation stack, in `cv/`: enhancement, artifact learning, grid
 correction, illumination field, acuity adaptation, MOG2, the detector, the
 evidence accumulator. None of that work is discarded — the detector still
 needs the best possible frame, and this fork does nothing to help it get one
-that HLSLS was not already doing.
+that LiveCam was not already doing.
 
 `cv/cv_processor.py` additionally carries tina's own local tuning: the
 temporal-denoise weights `0.60 / 0.20 / 0.20` from its live install, rather
-than the HLSLS default `0.44 / 0.28 / 0.28`.
+than LiveCam's default `0.44 / 0.28 / 0.28`.
 
 ## What changed
 
@@ -119,7 +119,7 @@ runs.
 
 ## Licence
 
-GPL-3.0-or-later, the same as `hls-livecam-server` — see [LICENSE](LICENSE).
+GPL-3.0-or-later, the same as `laptop-livecam` — see [LICENSE](LICENSE).
 Everything under `cv/` is carried over from that project unchanged in
 substance, so it cannot be under anything else.
 
