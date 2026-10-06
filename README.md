@@ -124,3 +124,25 @@ Everything under `cv/` is carried over from that project unchanged in
 substance, so it cannot be under anything else.
 
 Detector weights are **not** redistributed here; see [doc/README.md](doc/README.md).
+
+## Camera-missing fallback (pilot, running on tina)
+
+On Linux the microphone rides in `/cam` with the picture. tina's USB camera
+drops off the bus, and when it did, the room's audio went with it: no frame,
+nothing written to the v4l2 loopback, no publisher, so no `/cam`, no HLS
+listening, no `roomaudio` and no two-way.
+
+`hlsls/broadcast-api.camera-fallback.patch` keeps `/cam` up instead. While the
+camera is missing or stalled (no frame for `CAMERA_FRESH_S`, the same 3 s after
+which the panel's camera lamp goes down), the writer loop publishes a black
+frame on the live microphone. The drain loop keeps reopening the camera, and
+the picture returns by itself. Both transitions are logged
+(`camera missing ...`, `camera back`).
+
+It is a patch on hls-livecam-server's `broadcast-api` (as deployed on tina and
+tanzania on 2026-10-05, upstream 50b06ad):
+
+    sudo patch /usr/local/bin/broadcast-api < hlsls/broadcast-api.camera-fallback.patch
+    sudo systemctl restart broadcast-api
+
+`patch -R` with the same file takes it back out.

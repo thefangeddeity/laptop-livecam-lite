@@ -1,0 +1,60 @@
+--- a/broadcast-api
++++ b/broadcast-api
+@@ -592,6 +592,11 @@
+ # a v4l2 ioctl is running, burning CPU and delivering nothing, and every
+ # liveness check calls that healthy.
+ _cam_frame_at   = 0.0
++# A camera frame older than this is a camera that is not delivering: the
++# panel's camera lamp goes 'down' past it, and (laptop-livecam-lite) the
++# writer loop stops waiting for it -- see _writer_loop.
++CAMERA_FRESH_S  = 3.0
++_cam_missing    = False
+ _cam_frame_lock = threading.Lock()
+ 
+ # -- Room audio ---------------------------------------------------------
+@@ -1149,7 +1154,7 @@
+             time.sleep(1.0)
+ 
+ def _writer_loop():
+-    global _hide_frame
++    global _hide_frame, _cam_missing
+     denv  = _read_device_env()
+     fr    = int(denv.get('FRAMERATE', 15))
+     delay = 1.0 / fr
+@@ -1230,9 +1235,26 @@
+         try:
+             with _cam_frame_lock:
+                 raw = _cam_frame
+-            if raw is None:
++                raw_at = _cam_frame_at
++            # CAMERA MISSING (laptop-livecam-lite). The microphone rides in
++            # /cam with the picture, so a camera that drops off the USB bus
++            # used to take the room's audio down with it: no frame, nothing
++            # written to the loopback, no publisher, no /cam -- and no HLS
++            # listening, no roomaudio, no two-way. Now the loop keeps writing
++            # a black frame while the camera is missing or stalled, so /cam
++            # stays up on the live mic. The drain loop keeps reopening the
++            # camera, and the picture returns by itself when it comes back.
++            if raw is None or time.time() - raw_at > CAMERA_FRESH_S:
++                if not _cam_missing:
++                    _cam_missing = True
++                    print('broadcast-api: camera missing -- publishing a black '
++                          'frame so the room audio stays up', flush=True)
++                loop_cam.schedule_frame(_render_hide_frame(FRAME_W, FRAME_H))
+                 time.sleep(delay)
+                 continue
++            if _cam_missing:
++                _cam_missing = False
++                print('broadcast-api: camera back', flush=True)
+ 
+             if mode == 'show':
+                 frame_arr = np.frombuffer(raw, np.uint8).reshape(FRAME_H, FRAME_W, 3)
+@@ -1361,7 +1383,7 @@
+     with _mode_lock:
+         mode = _mode
+     with _cam_frame_lock:
+-        fresh = (now - _cam_frame_at) < 3.0 if _cam_frame_at else False
++        fresh = (now - _cam_frame_at) < CAMERA_FRESH_S if _cam_frame_at else False
+ 
+     denv = _read_device_env()
+     a_on = _audio_conf(denv)[0]
