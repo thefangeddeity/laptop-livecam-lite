@@ -1473,32 +1473,16 @@ class CVProcessor:
         return _cvo.deblock_grid(frame, self._grid_prior, self._grid_strength)
 
     def _capability_line(self):
-        """Right-aligned HUD summary of the CV stages actually running.
+        """Compact viewer-facing CV telemetry."""
+        bits = ['CV']
 
-        Reads live state, never configuration intent: a stage that failed to
-        initialise, or that this build does not implement, does not appear.
-        """
-        style = (self._edge_style if self._edge_style in self._KNOWN_EDGE_STYLES
-                 else 'overlay')
-        bits = []
-        if self._edge_enabled:
-            bits.append(style.upper())
-        if self._grid_correct and self._grid_prior is not None:
-            bits.append('DEBLOCK')
-        if self._foveal_enabled:
-            bits.append('FOVEAL')
-        if getattr(self, '_scene_enabled', False) and self._scene_registered:
-            bits.append('SCENE STALE' if self._scene_stale else 'SCENE 2D')
-        if getattr(self, '_persist_enabled', False) and self._persist_store is not None:
-            n = len(self._persist_store.persistent())
-            bits.append(f'PERSISTENT 2D ({n})' if n else 'PERSISTENT 2D')
-        line = ' \u00b7 '.join(bits)
-        # Acuity reads as a qualifier on everything above it rather than
-        # another item in the list, so it joins with "AT".
+        if self._foveal_enabled and getattr(self, '_mog2', None) is not None:
+            bits.append('MOG2')
+
         if self._acuity_adapt and self._acuity_last is not None:
-            at = f'AT ACUITY {self._detect_scale:.2f}'
-            line = f'{line} {at}' if line else at
-        return line
+            bits.append(f'ACUITY {self._detect_scale:.1f}')
+
+        return ' / '.join(bits)
 
     def _detect_and_hud(self, source_frame, canvas):
         """Render-only: draws SHAKey telemetry from the tracker's current
