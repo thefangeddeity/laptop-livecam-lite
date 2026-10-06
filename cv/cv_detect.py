@@ -567,60 +567,41 @@ def draw_hud(canvas, tracks, ink=(220, 220, 220), capabilities=None):
     if candidates:
         text += f" +{candidates} CANDIDATE{'S' if candidates != 1 else ''}"
 
-    # macOS-light-inspired telemetry:
-    # smaller, lighter, quieter, and using the same visual weight as the
-    # floating target labels rather than the old heavy surveillance text.
-    telemetry_ink = tuple(
-        max(1, min(255, int(round(channel * 0.88))))
-        for channel in ink
-    )
-
+    # Bottom-left telemetry block.
+    # Primary state first; supporting CV capability line directly beneath it.
     telemetry_font = cv2.FONT_HERSHEY_SIMPLEX
-    telemetry_scale = 0.52
-    telemetry_thickness = 1
-    telemetry_spacing = 3
+
+    hud_font = cv2.FONT_HERSHEY_SIMPLEX
+    hud_scale = 0.42
+    hud_thickness = 1
+    hud_ink = ink
 
     tx = 18
-    ty = h - 42
+    primary_y = h - 42
+    secondary_y = h - 22
 
-    # Right-aligned companion to the DETECTING banner: which CV tools are
-    # actually running. Same ink, size and baseline so the two read as one
-    # telemetry strip rather than two unrelated overlays.
+    cv2.putText(
+        out,
+        text,
+        (tx, primary_y),
+        hud_font,
+        hud_scale,
+        hud_ink,
+        hud_thickness,
+        cv2.LINE_AA,
+    )
+
     if capabilities:
-        cap = str(capabilities)
-        cap_w = 0
-        for ch_ in cap:
-            (cw_, _), _ = cv2.getTextSize(ch_, telemetry_font, telemetry_scale,
-                                          telemetry_thickness)
-            cap_w += cw_ + telemetry_spacing
-        cx_ = max(18, w - 18 - cap_w)
-        for ch_ in cap:
-            (cw_, _), _ = cv2.getTextSize(ch_, telemetry_font, telemetry_scale,
-                                          telemetry_thickness)
-            cv2.putText(out, ch_, (cx_, ty), telemetry_font, telemetry_scale,
-                        telemetry_ink, telemetry_thickness, cv2.LINE_AA)
-            cx_ += cw_ + telemetry_spacing
-
-    for char in text:
-        (cw, ch), _ = cv2.getTextSize(
-            char,
-            telemetry_font,
-            telemetry_scale,
-            telemetry_thickness,
-        )
-
         cv2.putText(
             out,
-            char,
-            (tx, ty),
+            str(capabilities),
+            (tx, secondary_y),
             telemetry_font,
-            telemetry_scale,
-            telemetry_ink,
-            telemetry_thickness,
+            secondary_scale,
+            secondary_ink,
+            secondary_thickness,
             cv2.LINE_AA,
         )
-
-        tx += cw + telemetry_spacing
 
     tag_font = cv2.FONT_HERSHEY_SIMPLEX
     tag_scale = 0.52
@@ -631,7 +612,8 @@ def draw_hud(canvas, tracks, ink=(220, 220, 220), capabilities=None):
     tag_gap = 12
     tag_height = 24
 
-    hud_clear = (8, 8, min(w - 8, 430), 155)
+    # Reserve only the actual two-line HUD footprint in the lower-left.
+    hud_clear = (8, h - 62, min(w - 8, 540), h - 8)
 
     def rects_overlap(a, b, margin=4):
         ax1, ay1, ax2, ay2 = a

@@ -20,3 +20,7 @@ doc/stability.png
 # Redistributing them from a public GPL-3.0 repo would answer that question
 # by accident. Fetch them locally instead -- see doc/README.md.
 cv/models/*.onnx
+
+# Cross-vendor scratch (hive architecture) -- ephemeral by design, never
+# versioned. See inserver/README.md.
+aibridge/
