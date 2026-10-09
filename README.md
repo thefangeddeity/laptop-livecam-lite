@@ -167,7 +167,7 @@ This repo is **public**. It is anonymized along three separate axes; none
 substitutes for another, and all three apply to anything added here.
 
 **1. Personal attribution.** No maintainer name in comments. `hls-livecam`
-commit `de7c732` relabelled `ron` -> `dev` throughout; this tree goes further
+commit `de7c732` replaced the maintainer name with `dev` throughout; this tree goes further
 and removes the *quotation* too, because a quoted line is still one person's
 words even under an anonymous label. `(dev: "X")` becomes `(requirement: X)`.
 The rationale each comment records is unchanged.
