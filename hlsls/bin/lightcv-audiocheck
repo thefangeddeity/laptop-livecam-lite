@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+#
+# Is there actually any SOUND on the capture device?
+#
+# WHY: on 2026-10-09 tina's viewer showed "HLS AUDIO LIVE", a green Mic lamp and
+# a moving IN meter while carrying no room audio whatsoever. The meter was
+# tracking a DC offset from an empty mic jack, and speechnorm (e=12.5) was
+# expanding that offset until it looked like signal. Every indicator we had
+# could only prove bytes were moving, not that they were sound.
+#
+# So this measures the AUDIBLE BAND specifically, and reports the sub-40 Hz
+# energy separately -- because a floating input reads loud and means nothing.
+#
+# Usage: lightcv-audiocheck [device] [seconds]
+set -euo pipefail
+
+DEV="${1:-hw:0,0}"
+SECS="${2:-6}"
+WAV="$(mktemp -t audiocheck.XXXXXX.wav)"
+trap 'rm -f "$WAV"' EXIT
+
+# ALSA capture is exclusive on this codec, so say so plainly rather than
+# emitting a confusing ffmpeg error.
+if ! ffmpeg -hide_banner -loglevel error -f alsa -ac 2 -ar 48000 -i "$DEV" \
+      -t "$SECS" -c:a pcm_s16le -y "$WAV" 2>/dev/null; then
+  echo "FAIL  cannot open $DEV (in use? broadcast-api holds it -- stop it first)"
+  exit 2
+fi
+
+band() { # band <label> <filter>
+  local v
+  v=$(ffmpeg -hide_banner -i "$WAV" -af "$2,volumedetect" -f null - 2>&1 \
+      | grep mean_volume | tail -1 | sed 's/.*mean_volume: //; s/ dB//')
+  printf '  %-18s %8s dB\n' "$1" "$v"
+  printf -v "$3" '%s' "$v"
+}
+
+echo "audiocheck: $DEV, ${SECS}s"
+band "sub-40Hz (DC)"   "lowpass=f=40"                 DC
+band "45-65Hz (mains)" "highpass=f=45,lowpass=f=65"   HUM
+band "audible 300-4k"  "highpass=f=300,lowpass=f=4000" AUD
+
+# A real room, even a quiet one, puts something in the speech band. Below
+# -70 dB there is nothing a listener would ever hear.
+verdict=$(awk -v a="$AUD" -v d="$DC" 'BEGIN{
+  if (a < -70) { if (d > a + 20) print "DEAD INPUT -- audible band silent, energy is DC offset (floating/empty jack)";
+                 else print "DEAD INPUT -- audible band silent" }
+  else if (a < -55) print "WEAK -- audible but very quiet"
+  else print "OK -- real sound present"
+}')
+echo
+echo "  verdict: $verdict"
+case "$verdict" in
+  DEAD*) exit 1 ;;
+  WEAK*) exit 0 ;;
+esac

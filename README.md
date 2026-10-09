@@ -146,3 +146,70 @@ tanzania on 2026-10-05, upstream 50b06ad):
     sudo systemctl restart broadcast-api
 
 `patch -R` with the same file takes it back out.
+
+## Owning what tina actually runs (`hlsls/`)
+
+Until 2026-10-09 every artifact that ran tina lived **only** on the filesystem.
+The viewer at `/var/www/hls-livecam` was hand-installed and tracked nowhere, so
+when `vendor/hls.min.js` went missing the viewer silently fell back to native
+HLS and there was no source of truth to compare against. `hlsls/` now mirrors
+the deployed node:
+
+    hlsls/bin/broadcast-api          -> /usr/local/bin/broadcast-api
+    hlsls/web/                       -> /var/www/hls-livecam/
+    hlsls/etc/nginx/hls-livecam.conf -> /etc/nginx/conf.d/
+    hlsls/etc/systemd/*              -> /etc/systemd/system/
+    hlsls/deploy.sh                     the only path from tree to box
+
+### Node identity is not in this repo
+
+This repo is **public**; the tailnet name and the machines on it are not. Files
+ending `.in` are templates carrying `@TAILNET_HOST@`, filled at deploy time
+from `hlsls/node.env` (gitignored -- copy `node.env.example`). `deploy.sh`
+aborts if any placeholder survives rendering.
+
+`web/cams/cams.json` lists real machines by label and tailnet IP, so it is
+runtime state on the box and is never shipped from here, not even as a default.
+`web/cams/cams.example.json` shows its shape.
+
+`deploy.sh` copies only files this repo owns. It never uses `--delete` and
+never touches runtime state (`broadcast.txt`, `buzz.txt`, `cams.json`), because
+the running system writes those. `--dry-run` shows the diff; an unchanged
+deploy is a true no-op and does not bounce nginx.
+
+`/etc/hls-livecam/device.env` is the **admin tier** -- node-specific hardware
+values -- and is deliberately *not* deployed. `etc/hls-livecam/device.env.example`
+tracks its shape only.
+
+### Ports
+
+tina redirects `:8080` -> `https://<node>.<tailnet>.ts.net:8443`, so there
+is no plaintext fallback: if the Tailscale cert lapses the viewer is simply
+down. tanzania still serves plain HTTP on `:8080` with no TLS and no redirect.
+The two nodes are deliberately not alike here; decide before copying either.
+
+### `lightcv-audiocheck` -- prove the mic carries *sound*
+
+    hlsls/bin/lightcv-audiocheck [device] [seconds]
+
+tina's panel showed "HLS AUDIO LIVE", a green Mic lamp and a moving IN meter
+while carrying **no room audio at all**. The meter was tracking a DC offset
+from an empty mic jack, which `speechnorm=e=12.5` then expanded until it
+resembled signal. Every indicator we had could prove bytes were moving, not
+that they were sound.
+
+This measures the audible band (300 Hz-4 kHz) separately from sub-40 Hz energy
+and calls a floating input what it is. On tina it reports:
+
+    sub-40Hz (DC)         -35.7 dB
+    audible 300-4k        -82.5 dB
+    verdict: DEAD INPUT -- audible band silent, energy is DC offset
+
+**tina has no working microphone.** Its HDA codec exposes exactly one input pin
+(`0x1a`, the external pink 1/8" jack, which reads `Mic Jack: off`) and no
+internal mic pin at all. The USB camera (`0c45:6366`) is video-only -- the
+kernel has only ever bound `uvcvideo` to it, never `snd-usb-audio`, and no
+second sound card has ever appeared. Room audio on this node therefore requires
+physically plugging a mic into the pink jack, or adding a USB mic. No software
+change can recover it, and the planned "invert which leg owns ALSA" fix would
+have kept the stream up and still silent.

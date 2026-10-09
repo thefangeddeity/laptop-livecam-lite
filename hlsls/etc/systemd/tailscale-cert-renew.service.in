@@ -1,0 +1,17 @@
+[Unit]
+# The cert this replaces had been expired for six weeks, because nothing
+# renewed it: it was issued by hand once and then forgotten. Tailscale certs
+# last ~90 days, so a one-off issuance is a dated time bomb, not a setup step.
+Description=Renew the Tailscale TLS cert used by nginx
+After=tailscaled.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Idempotent: tailscale only fetches when the existing cert is near expiry,
+# so running this daily costs nothing and removes the chance of missing a
+# window.
+ExecStart=/usr/bin/tailscale cert --cert-file /etc/nginx/certs/@TAILNET_HOST@.crt --key-file /etc/nginx/certs/@TAILNET_HOST@.key @TAILNET_HOST@
+# Reload rather than restart: nginx picks up the new cert without dropping a
+# single connection, and a live viewer does not blink.
+ExecStartPost=/bin/systemctl reload nginx

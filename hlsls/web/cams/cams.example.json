@@ -1,0 +1,16 @@
+[
+  {
+    "label": "Node A",
+    "ip": "100.64.0.1",
+    "stream_path": ":8888/cam/index.m3u8",
+    "pinned": true,
+    "api_port": 8080
+  },
+  {
+    "label": "Node B",
+    "ip": "100.64.0.2",
+    "stream_path": ":8888/cam/index.m3u8",
+    "pinned": false,
+    "api_port": 8080
+  }
+]

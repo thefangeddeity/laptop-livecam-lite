@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily check of the Tailscale TLS cert
+
+[Timer]
+OnCalendar=daily
+# Survives the box being off at the scheduled moment -- which, for a machine
+# in a house rather than a datacentre, is the normal case.
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target
