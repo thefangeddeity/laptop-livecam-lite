@@ -62,8 +62,8 @@ def _normalize_mode(val):
 
 MAX_LEN         = 120
 DEVICE_ENV      = '/etc/hls-livecam/device.env'
-# TWO TIERS, deliberately (dev: "one for things you should tweak, one for things
-# it's safe for a user to tweak"). device.env is the ADMIN tier: hardware and
+# TWO TIERS, deliberately (requirement: one for things you should tweak, one for things
+# it's safe for a user to tweak). device.env is the ADMIN tier: hardware and
 # plumbing -- devices, loopback, backend, notches, ECHO_DUCK -- root-owned, my
 # domain. The USER-SAFE tier below is the DSP knobs the Settings panel lets a
 # user tweak freely; they live in their OWN group-writable file, NEVER in
@@ -200,7 +200,7 @@ _talk_since  = 0.0       # session marker: set ONCE at true session start, uncha
 _talk_last_seen = 0.0     # last time the client proved the page is alive (a GET
                           # /api/talk poll, or session start). Heartbeat-driven
                           # liveness REPLACES the old fixed TALK_MAX_SECONDS cap
-                          # (dev: two-way was cutting out "for no reason" at 120s
+                          # (requirement: two-way was cutting out "for no reason" at 120s
                           # -- that was a one-shot Timer, not a real fault). A
                           # session now runs indefinitely as long as the client
                           # keeps polling; it only ends when the page actually
@@ -313,8 +313,8 @@ def _talk_af(denv):
     gain = (denv.get('TALK_GAIN_DB', '') or '').strip() or '-15'
     if gain and gain != '0':
         parts.append(f'volume={gain}dB')
-    # TEST-ONLY server speaker mute (dev: "for RTC testing purposes, leaves
-    # everything intact, just mutes server speaker"). Applied LAST, after
+    # TEST-ONLY server speaker mute (requirement: for RTC testing purposes, leaves
+    # everything intact, just mutes server speaker). Applied LAST, after
     # every other stage, so the whole real pipeline still runs -- capture,
     # notches, band-limit, gain, roomaudio publish, the RTC signaling itself
     # -- and only the final physical loudness is zeroed. Lets an operator
@@ -894,7 +894,7 @@ def _start_loopback_publisher(denv, mode='show'):
             # below 80 Hz removes room rumble, HVAC and handling thumps with no
             # effect on speech. AUDIO_HIGHPASS_HZ tunes it; 'off' disables.
             #
-            # CASCADED STAGES (ported from 7elwe, 2026-09-10): ffmpeg's highpass
+            # CASCADED STAGES (ported from a sibling node, 2026-09-10): ffmpeg's highpass
             # is a single 2nd-order Butterworth section, 12 dB/oct -- too gentle
             # a shoulder for broadband road/traffic rumble. Measured there:
             # dragging the corner from 200->300 Hz bought only -3.6 dB at
@@ -905,7 +905,7 @@ def _start_loopback_publisher(denv, mode='show'):
             # corner untouched, so the corner can stay speech-safe (~250-300 Hz)
             # and the shoulder gets as steep as the room needs. Admin-only
             # (device.env, not AUDIO_TUNABLES) for now -- a Settings-panel
-            # control can follow once someone other than 7elwe needs it.
+            # control can follow once a second node needs it.
             #
             # NOT LIVE-RELOADABLE: this key is read only when the /cam
             # publisher is (re)spawned, and nothing wires an edit to it into
@@ -914,7 +914,7 @@ def _start_loopback_publisher(denv, mode='show'):
             # change (mode changes no longer respawn the publisher at all --
             # see the writer loop's own note on that, just below). Editing
             # device.env alone does NOTHING until broadcast-api actually
-            # restarts. 7elwe hit exactly this as a real bug (their equivalent
+            # restarts. a sibling node hit exactly this as a real bug (their equivalent
             # STAGES key round-tripped through their API as "accepted" while
             # doing nothing, because it wasn't wired into their respawn
             # trigger either) -- a silent no-op is worse than no knob, so if
@@ -934,10 +934,11 @@ def _start_loopback_publisher(denv, mode='show'):
             # Applied to /cam, so both Monitor and the roomaudio leg get it.
             # AUDIO_LOWPASS_HZ tunes it; 'off' disables.
             #
-            # CASCADED STAGES, mirroring highpass (ron: "LP slope should also
-            # be there"; 7elwe independently reached the same conclusion --
-            # "HF hiss was this room's loudest octave before treatment, so
-            # the top shoulder had exactly the weakness the bottom one did").
+            # CASCADED STAGES, mirroring highpass: the low-pass slope needs
+            # the same treatment the high-pass got. A sibling node reached the
+            # same conclusion independently -- HF hiss was the loudest octave
+            # in that room before treatment, so the top shoulder had exactly
+            # the weakness the bottom one did.
             # Same NOT-LIVE-RELOADABLE caveat as AUDIO_HIGHPASS_STAGES above
             # applies here -- a device.env edit needs a service restart.
             lp = str(denv.get('AUDIO_LOWPASS_HZ', '14000')).strip()
@@ -1627,8 +1628,8 @@ def audio_settings_post():
     # safety net and is NOT reachable from here regardless of this value.
     tg = _num(body.get('TALK_GAIN_DB'))
     if tg is not None: out['TALK_GAIN_DB'] = str(round(max(-20.0, min(12.0, tg)), 1))
-    # TEST-ONLY server speaker mute (dev: "for RTC testing purposes, leaves
-    # everything intact, just mutes server speaker"). A real boolean, not a
+    # TEST-ONLY server speaker mute (requirement: for RTC testing purposes, leaves
+    # everything intact, just mutes server speaker). A real boolean, not a
     # clamped number -- present in the body at all (even false) is a real
     # instruction, distinct from every other field's "absent = leave alone".
     if 'TALK_MUTE_SPEAKER' in body:
@@ -1649,8 +1650,8 @@ def audio_settings_post():
     # Only respawn the /cam ROOM publisher when a key it actually reads
     # changed. TALK_GAIN_DB and TALK_MUTE_SPEAKER feed the talk pipeline
     # (_talk_af) only -- setting _audio_reload_evt for those needlessly
-    # bounced HLS/room audio on every RTC-only tweak (dev: "Make sure none
-    # of your muting wirings killed HLS audio" -- they did; this was why).
+    # bounced HLS/room audio on every RTC-only tweak (requirement: Make sure none
+    # of your muting wirings killed HLS audio -- they did; this was why).
     if any(k in out for k in ('AUDIO_HIGHPASS_HZ', 'AUDIO_LOWPASS_HZ', 'AUDIO_GAIN_DB')):
         _audio_reload_evt.set()
     if 'TALK_MUTE_SPEAKER' in out or 'TALK_GAIN_DB' in out:
@@ -1681,9 +1682,9 @@ def _write_notches(doc):
 def _notches_response(doc):
     # One envelope for every notch endpoint: the per-entry list, so the
     # client never has to make a second request to see the result of an
-    # edit. No master on/off any more (dev: "Logic of 'All notch filters'
+    # edit. No master on/off any more (requirement: Logic of 'All notch filters'
     # toggle is wrong... you should still be able to hand-select which ones
-    # you want" -- a sticky master that blocked per-entry editing when off
+    # you want -- a sticky master that blocked per-entry editing when off
     # was the bug). See notches_patch for the bulk on/off actions that
     # replaced it.
     return _json.dumps({'notches': doc.get('notches', [])}), 200, {'Content-Type': 'application/json'}
@@ -1691,8 +1692,8 @@ def _notches_response(doc):
 
 @app.route('/api/notches', methods=['GET'])
 def notches_get():
-    """The notch filter database, for the Settings submenu (dev: 'add comb
-    filter to SETTINGS panel... maybe as a submenu'). Exposes the curated
+    """The notch filter database, for the Settings submenu (requirement: add comb
+    filter to SETTINGS panel... maybe as a submenu). Exposes the curated
     feedback-tone list for view/add/remove, on the SAME file broadcast-api
     already reads at every publisher (re)build."""
     return _notches_response(_read_notches())
@@ -1759,13 +1760,13 @@ def notches_delete():
 def notches_patch():
     """Toggle a notch's enabled state, body {"enabled": bool}.
 
-    With ?i=N: one entry, bypass it without deleting it (dev: 'each notch
-    could have its toggle'). WITHOUT ?i: a BULK action -- sets every entry
+    With ?i=N: one entry, bypass it without deleting it (requirement: each notch
+    could have its toggle). WITHOUT ?i: a BULK action -- sets every entry
     to the same enabled value in one request ("Turn on/off all notch
     filters"). This replaced a sticky master switch that silenced every
-    notch independent of each one's own flag (dev: "Logic of 'All notch
+    notch independent of each one's own flag (requirement: Logic of 'All notch
     filters' toggle is wrong... you should still be able to hand-select
-    which ones you want" -- the master blocked per-entry editing while off,
+    which ones you want -- the master blocked per-entry editing while off,
     which was the bug). A bulk action has no state of its own to fight: it
     just sets every entry's flag once and individual toggles stay live
     always. Applies on the next /cam publisher (re)build, same as add/remove."""
@@ -1805,8 +1806,8 @@ def _notch_center_hz(item):
 
 @app.route('/api/notches/sort', methods=['POST'])
 def notches_sort():
-    """Reorder the list by centre frequency (dev: 'Add button to order all
-    by frequency'), restoring the file's own stated convention ('Ordered by
+    """Reorder the list by centre frequency (requirement: Add button to order all
+    by frequency), restoring the file's own stated convention ('Ordered by
     frequency' -- see notches.json's _comment) after manual/API additions
     append to the end regardless of where they'd sort. Order has no effect
     on what's audible (bandreject filters are independent of each other in

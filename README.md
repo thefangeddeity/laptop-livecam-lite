@@ -161,16 +161,31 @@ the deployed node:
     hlsls/etc/systemd/*              -> /etc/systemd/system/
     hlsls/deploy.sh                     the only path from tree to box
 
-### Node identity is not in this repo
+### Anonymization: three axes, all required
 
-This repo is **public**; the tailnet name and the machines on it are not. Files
-ending `.in` are templates carrying `@TAILNET_HOST@`, filled at deploy time
-from `hlsls/node.env` (gitignored -- copy `node.env.example`). `deploy.sh`
-aborts if any placeholder survives rendering.
+This repo is **public**. It is anonymized along three separate axes; none
+substitutes for another, and all three apply to anything added here.
+
+**1. Personal attribution.** No maintainer name in comments. `hls-livecam`
+commit `de7c732` relabelled `ron` -> `dev` throughout; this tree goes further
+and removes the *quotation* too, because a quoted line is still one person's
+words even under an anonymous label. `(dev: "X")` becomes `(requirement: X)`.
+The rationale each comment records is unchanged.
+
+**2. Node identity.** The tailnet name and the machines on it stay out of the
+tree. Files ending `.in` carry `@TAILNET_HOST@` and `deploy.sh` fills them from
+`hlsls/node.env` (gitignored), aborting if a placeholder survives. Node
+nicknames are written as "a sibling node". The viewer already followed this
+convention with `https://<node>.ts.net`.
+
+**3. Camera-derived material.** Frames of a family living space never land
+here -- see the `.gitignore` entries, which exist because two `git add -A`
+sweeps brought such files in before the rules were written.
 
 `web/cams/cams.json` lists real machines by label and tailnet IP, so it is
 runtime state on the box and is never shipped from here, not even as a default.
 `web/cams/cams.example.json` shows its shape.
+
 
 `deploy.sh` copies only files this repo owns. It never uses `--delete` and
 never touches runtime state (`broadcast.txt`, `buzz.txt`, `cams.json`), because

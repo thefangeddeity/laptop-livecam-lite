@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HLS Livecam</title>
 <!-- The browser-tab art, same brand mark the header already uses --
-     Tanzania never had a favicon link at all (dev: "you forgot to add the
-     browser tab art... on Tanzania"), so tabs fell back to the browser's
+     Tanzania never had a favicon link at all (requirement: you forgot to add the
+     browser tab art... on Tanzania), so tabs fell back to the browser's
      blank default. Ariana already links hers; this is the missing half. -->
 <link rel="icon" href="/brand.png">
 <link rel="apple-touch-icon" href="/brand.png">
@@ -180,9 +180,9 @@
        height comes from flex (the parent, not its content), so this is safe
        containment, not a collapse risk. */
     container-type: size;
-    /* No reason to letterbox when there's room to fit exactly (dev: "plenty
+    /* No reason to letterbox when there's room to fit exactly (requirement: plenty
        of wiggle room to adjust display rectangle... no reason to have
-       letterboxing" -- "without prejudice to when video feed size forces
+       letterboxing -- "without prejudice to when video feed size forces
        letterboxing", i.e. this is a should-fit-exactly default, not a
        guarantee). --feed-ar is the single feed-dimensions reference (see
        updateFeedAR in the script) -- when this box can actually BE that
@@ -238,8 +238,8 @@
      is the one thing CSS cannot measure (a font's cap-height/em ratio) --
      JS sets it ONCE, with no video-dimension dependency, so no race there
      either; the value below is only the fallback before that runs. */
-  /* GRID ABSTRACTION (dev: "back-end grid abstraction for display screen,
-     HUD goes one character indented and on row 2"). Two independent
+  /* GRID ABSTRACTION (requirement: back-end grid abstraction for display screen,
+     HUD goes one character indented and on row 2). Two independent
      mathematical constants, one per axis, per dev -- no font measurement,
      no eyeballing: row pitch (vertical) is e% (2.71828cqh, the same cap-
      height constant every other HUD metric on this page already uses);
@@ -249,8 +249,8 @@
     --hud-cap-ratio: 0.716;
     --grid-row: 2.71828cqh;
     --grid-col: calc(var(--grid-row) / 1.41421356);
-    /* TWO separately-named units, a common middle point (dev: "concrete
-       padding" -- the top-edge gap and the between-lines gap render
+    /* TWO separately-named units, a common middle point (requirement: concrete
+       padding -- the top-edge gap and the between-lines gap render
        differently at equal raw values because a between-lines gap sums
        BOTH adjacent lines' own leading while an edge gap only picks up
        one, so pure equality doesn't read as equal; split the difference
@@ -260,8 +260,8 @@
        is vertical rhythm, not character width. */
     --edge-padding-unit: calc(var(--grid-row) * 0.225);
     --linespace-padding-unit: calc(var(--grid-row) * 0.225);
-    /* FOUND IT, ROUND TWO (dev: "right edge has no limit... now do bottom
-       edge"): padding only reserves space for content that FITS -- it is
+    /* FOUND IT, ROUND TWO (requirement: right edge has no limit... now do bottom
+       edge): padding only reserves space for content that FITS -- it is
        not a wall. Overflowing block content just flows straight through
        padding-bottom and gets clipped at the outer padding-box edge, past
        where the margin should be (this is exactly why padding-right didn't
@@ -274,14 +274,14 @@
        all four sides by construction, nothing left to special-case. */
     /* z-index 25, not 6: above .crt-stage (22) and .switch-overlay, so the
        HUD keeps reading through a switch/power-off transition instead of
-       being buried under the snow (dev: "HUD should draw over static
-       too") -- pointer-events:none below means it still never eats the
+       being buried under the snow (requirement: HUD should draw over static
+       too) -- pointer-events:none below means it still never eats the
        static's own clicks/animation underneath it. */
     position: absolute; z-index: 25; inset: var(--grid-col); overflow: hidden;
     display: grid; grid-auto-rows: auto; row-gap: var(--linespace-padding-unit);
     align-items: start;
     font-size: calc(2.71828cqh / var(--hud-cap-ratio));
-    /* Back to Arial (dev: "get the friggin font") -- matches the burned-in
+    /* Back to Arial (requirement: get the friggin font) -- matches the burned-in
        server HUD's FONT_HERSHEY_SIMPLEX look, which is the point of a HUD
        that's meant to read as the SAME telemetry as the picture's own.
        The brief var(--mono) experiment bought exact per-glyph grid width
@@ -295,7 +295,7 @@
   }
   .video-hud.show { opacity: 1; }
   .hud-line { line-height: normal; }
-  /* CV telemetry, bottom-left (dev: "bottom two lines for CV status") --
+  /* CV telemetry, bottom-left (requirement: bottom two lines for CV status) --
      the same corner the burned-in server HUD occupies, so the client
      overlay reads as the SAME instrument rather than a second one stuck at
      the top. Its own flex stack, not a row in .video-hud's top grid: left:0/
@@ -309,8 +309,8 @@
     display: flex; flex-direction: column;
     gap: var(--linespace-padding-unit);
   }
-  /* Warnings/errors get the viewer's eye, not a corner (dev: "centered
-     horizontally too, not just vertically"): breaks #hudError out of the
+  /* Warnings/errors get the viewer's eye, not a corner (requirement: centered
+     horizontally too, not just vertically): breaks #hudError out of the
      grid's row-2 slot (absolute + inset:0 removes it from grid flow
      entirely) and centers it over the WHOLE picture on both axes.
      #hudStatus is untouched -- routine state stays put in the grid corner.
@@ -356,8 +356,8 @@
   .callctl:disabled.end { background: linear-gradient(180deg,#2c2c30,#232326); border-color: #34343a; }
   .callctl:disabled.end svg { stroke: #d6d6da; }
   .setsubtoggle { font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--phos-label); padding: 4px 2px 2px; text-align: left; }
-  /* #combToggle is a PLAIN, UNMODIFIED .reset -- a clone of Reload (dev: "you're
-     thrashing; remove button altogether and clone Reload button, no LED").
+  /* #combToggle is a PLAIN, UNMODIFIED .reset -- a clone of Reload (requirement: you're
+     thrashing; remove button altogether and clone Reload button, no LED).
      No dedicated CSS at all: every custom touch tried so far (an led-on
      green pin, a repositioned-but-still-glowing pin, a corrected-geometry
      slide) kept reading as a lamp in one way or another. It does not need to
@@ -365,7 +365,7 @@
   .combrow { display: flex; align-items: center; gap: 8px; padding: 3px 2px; font-size: 10.5px; }
   /* Bypass, not delete: a pilot light per notch, lit = filtering, dark = held
      in the list but not applied to the audio right now. .pinled + .bulb now
-     (dev: "exactly like the global pilot button"), not a bespoke flat dot --
+     (requirement: exactly like the global pilot button), not a bespoke flat dot --
      .pinled/.bulb/.bulb.on already provide the full look, this rule is just
      the row-scoped margin that keeps it flush with the compact combrow text. */
   .combrow .combtoggle { margin: 0; }
@@ -374,8 +374,8 @@
   .combrow .combnote { flex: 0 1 auto; max-width: 220px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--emboss-dim); }
   .combrow .combx { flex: 0 0 auto; width: 18px; height: 18px; line-height: 16px; text-align: center; padding: 0;
     border-radius: 4px; background: rgba(0,0,0,.18); border: 1px solid var(--border-strong); color: var(--text-dim); cursor: pointer; }
-  /* Sunk-in subsection (dev: "draw sunk-in textured border around notch
-     filters so it looks like a subsection") -- same recessed language the
+  /* Sunk-in subsection (requirement: draw sunk-in textured border around notch
+     filters so it looks like a subsection) -- same recessed language the
      LED wells already use on this page (--led-well's inset shadow), so the
      whole notch bank reads as ONE carved-in region under the Reload-style
      disclosure toggle, not just a loose stack of rows. */
@@ -524,13 +524,13 @@
     gap: 6px;
     pointer-events: none;
     z-index: 15;
-    /* Same family as .video-hud (dev: "for consistency, let's update this
-       font too, so it matches HUD") -- one look for everything drawn over
+    /* Same family as .video-hud (requirement: for consistency, let's update this
+       font too, so it matches HUD) -- one look for everything drawn over
        the picture, not a second typeface for "no signal" specifically. */
     font-family: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
   }
-  /* Removed (dev: "get rid of that basic no video message; it's obvious
-     from panel and graphics") -- the VIDEO panel's Hide button/LEDs and the
+  /* Removed (requirement: get rid of that basic no video message; it's obvious
+     from panel and graphics) -- the VIDEO panel's Hide button/LEDs and the
      plain dark picture already say this, and the centered text was
      colliding with #hudError's own centered messages with nowhere clean to
      put either one. JS still toggles .visible/.lit on hideOverlay (see
@@ -955,12 +955,12 @@
   .badge.scene-registered { color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--panel)); border-color: color-mix(in srgb, var(--success) 30%, var(--border)); }
   .badge.scene-stale { color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--panel)); border-color: color-mix(in srgb, var(--warn) 30%, var(--border)); }
   .badge.scene-unregistered { color: var(--text-muted); }
-  /* flex:1 + flex-start (dev: "have panels snug together toward top; I
-     don't like them spaced out like that" -- reverses an earlier
+  /* flex:1 + flex-start (requirement: have panels snug together toward top; I
+     don't like them spaced out like that -- reverses an earlier
      space-between pass that spread leftover height evenly BETWEEN panels
      so the last one's bottom edge lined up with the video's; dev now
      prefers panels packed together with the leftover height collecting
-     below the last one instead, same choice 7elwe's port independently
+     below the last one instead, same choice a sibling node's port independently
      landed on for its own shorter panel set). */
   .sidebar-scroll {
     display: flex;
@@ -1747,7 +1747,7 @@
       </div>
       <div class="panel" id="settingsPanel" hidden style="margin-top:6px;">
         <div class="panel-title eng">Settings</div>
-        <!-- Alphabetized (dev: "alphabetize these settings") -- Disable
+        <!-- Alphabetized (requirement: alphabetize these settings) -- Disable
              buzz, Light theme, Mute server speaker/headset in RTC. -->
         <!-- Disable buzz, moved here from the AV panel. -->
         <div class="pinrow">
@@ -1807,9 +1807,9 @@
           <span class="eng rstlab">Notch filters (<span id="combCount">0</span>)</span>
         </div>
         <div id="combMenu" hidden>
-          <!-- Bulk actions, not a sticky master switch (dev: "Logic of 'All
+          <!-- Bulk actions, not a sticky master switch (requirement: Logic of 'All
                notch filters' toggle is wrong... you should still be able to
-               hand-select which ones you want" -- the old master silenced
+               hand-select which ones you want -- the old master silenced
                every notch AND blocked editing individual ones while off,
                via #combList.bypassed-all's pointer-events:none). One-shot:
                click sets every entry's flag once, then individual toggles
@@ -1861,8 +1861,8 @@
   // blank on exactly the address people need to use to talk.
   var HLS_URL = window.location.origin + '/hls/cam/index.m3u8';
   var video        = document.getElementById('video');
-  // SINGLE feed-dimensions reference (dev: "one single 'feed dimensions'
-  // reference that all these anchor to, provided by cam or empirically").
+  // SINGLE feed-dimensions reference (requirement: one single 'feed dimensions'
+  // reference that all these anchor to, provided by cam or empirically).
   // Anything that needs the camera's real aspect ratio -- the static-noise
   // texture below, and anything future that needs to reason about the
   // letterboxed picture rect rather than the outer wrap box -- reads THIS,
@@ -2188,9 +2188,9 @@
     list.forEach(function (n, i) {
       var enabled = n.enabled !== false;   // absent key = enabled (matches the server default)
       var row = document.createElement('div'); row.className = 'combrow' + (enabled ? '' : ' bypassed');
-      // Exactly the master pilot light's own markup (dev: "individual notch
+      // Exactly the master pilot light's own markup (requirement: individual notch
       // filter pilot switches need to be exactly like the global pilot
-      // button") -- .pinled wrapping a .bulb, not the flat dot this used to
+      // button) -- .pinled wrapping a .bulb, not the flat dot this used to
       // be. The .on class lives on the BULB, matching every other lamp.
       var t = document.createElement('button'); t.type = 'button';
       t.className = 'pinled combtoggle';
@@ -2218,7 +2218,7 @@
       .then(function (data) { if (data) renderNotches(data); })
       .catch(function () {});
   }
-  // Bulk action (dev: "Turn on all notch filters" / "Turn off all notch
+  // Bulk action (requirement: Turn on all notch filters / "Turn off all notch
   // filters"), replacing the old sticky master switch: same PATCH endpoint,
   // no ?i -- the server reads that as "every entry", sets them all once,
   // and holds no state of its own. Individual toggles stay live always.
@@ -3096,7 +3096,7 @@
   // publisher restart, dev found, does this -- the manifest gap is often too
   // brief for the browser to ever fire 'error', so THAT path alone left
   // Monitor stuck silent with nothing watching for it).
-  // Separate hls.js instance dedicated to roomAudio (dev: iOS Safari graph
+  // Separate hls.js instance dedicated to roomAudio (requirement: iOS Safari graph
   // reads flat forever). Safari's NATIVE HLS pipeline for an <audio>
   // element doesn't reliably route decoded samples into
   // createMediaElementSource -- a documented WebKit limitation, not a bug
@@ -3346,8 +3346,8 @@
     }
   }
   function toggleMuteAudio() {
-    // Always toggleable (dev: "I can want to remember to toggle it off
-    // without needing it to be live"), not gated on a call being open. When
+    // Always toggleable (requirement: I can want to remember to toggle it off
+    // without needing it to be live), not gated on a call being open. When
     // no call exists there is nothing for applyMicMute() to actually mute
     // yet -- it no-ops on the twoWayStream check -- but the STATE still
     // changes and persists, so it is already armed the moment a call starts
@@ -3372,13 +3372,13 @@
   // business changing the play key's appearance, and the volume slider
   // shares this because a slider at zero is silence by another route.
   function paintMute() {
-    // NOT gated on a live call any more (dev: "I don't see why Mute mic
+    // NOT gated on a live call any more (requirement: I don't see why Mute mic
     // button has to be suppressed in Silence or HLS modes; I can want to
-    // remember to toggle it off without needing it to be live") -- always
+    // remember to toggle it off without needing it to be live) -- always
     // clickable, so the remembered state can be armed ahead of a call. The
     // same reasoning applies to the speaker test-mute below, symmetrically.
     // .pbtn.pressed matches the HLS/Silence/RTC language, AND the lamp is
-    // back (dev: widen the button, don't take the LED away) -- red/alarm is
+    // back (requirement: widen the button, don't take the LED away) -- red/alarm is
     // the one state on this panel worth flagging even at a glance, since a
     // muted mic during a live call is easy to forget you left on.
     var lamp = document.getElementById('muteLamp');
@@ -3872,7 +3872,7 @@
     if (el) el.style.setProperty('--hud-cap-ratio', ratio);
   })();
 
-  // Picture HUD (dev: "off my panel"), through the universal renderer. Line
+  // Picture HUD (requirement: off my panel), through the universal renderer. Line
   // 1 = live A/V status (TWO-WAY LIVE / HLS AUDIO LIVE); CV mode adds its
   // own two rows (see setHudCv below); errors get their own centered
   // overlay (#hudError). The whole HUD shows while ANY row has text.
@@ -4138,8 +4138,8 @@
     // the connection) -- which keeps reading the room even while muted,
     // since it taps the mic itself, not what's being sent. That is correct
     // for diagnosing "is my mic dead vs just muted", but it gave no visual
-    // confirmation that Mute mic actually did anything (dev: "I don't see a
-    // difference in sound graph after pressing Mute mic") -- forced to 0
+    // confirmation that Mute mic actually did anything (requirement: I don't see a
+    // difference in sound graph after pressing Mute mic) -- forced to 0
     // here, display-layer only, so the underlying tap/architecture is
     // unchanged for anyone who still wants that distinction later.
     var o = 0;
@@ -4227,8 +4227,8 @@
   var _monLastTime = -1, _monLastChangeAt = 0;
   // Two DIFFERENT stalls, both real: "playing but frozen" (currentTime stuck,
   // caught below) and "just stopped" (.paused went true with nothing to
-  // un-pause it). The second one was the actual bug (dev: "still need to hit
-  // reload... otherwise inbound audio gets stuck on off position") -- a
+  // un-pause it). The second one was the actual bug (requirement: still need to hit
+  // reload... otherwise inbound audio gets stuck on off position) -- a
   // settings-triggered publisher restart can pause the element WITHOUT ever
   // firing a DOM 'error' event (browsers are inconsistent about this for a
   // brief manifest gap), and the old check explicitly SKIPPED recovery
@@ -4280,8 +4280,8 @@
     // stalled/emptied) -- a transient error that fires once and then quietly
     // self-recovers (segments resume, roomAudio keeps playing) never refires
     // any of those, so the LED/HUD stay stuck on the stale paint forever.
-    // Cheap className/text writes, safe every tick (dev: "Says live but HLS
-    // LED is red and no graph").
+    // Cheap className/text writes, safe every tick (requirement: Says live but HLS
+    // LED is red and no graph).
     paintAudioModes();
     // Likewise the level meter's AudioContext only ever resumes from a page
     // click -- if it suspended with no click since, the graph reads flat
