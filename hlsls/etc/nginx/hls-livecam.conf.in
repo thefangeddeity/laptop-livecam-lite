@@ -1,0 +1,137 @@
+# Plain HTTP is now a redirect-only block. It is kept rather than removed so
+# existing bookmarks and typed URLs still land somewhere useful instead of
+# refusing the connection.
+#
+# The target is the NAME, not $host, deliberately: the tailnet address also
+# answers on <this node tailnet IP>, and bouncing an IP request to https://<ip> would
+# hand the browser a certificate that cannot match it. Sending everyone to the
+# name the cert is actually issued for turns a would-be TLS warning into a
+# working page.
+server {
+    listen 8080;
+    server_name _;
+    return 301 https://@TAILNET_HOST@:8443$request_uri;
+}
+
+server {
+    # TLS on the same block, not a second one: one copy of every location,
+    # so the plain and encrypted views can never drift apart. The viewer asks
+    # for window.location.origin + '/hls/...', '/api/...', '/talk/...', so it
+    # has to live at the ROOT of an origin -- a subpath under the existing 443
+    # block would break every one of those. 443 is already taken on this host
+    # by ele-messenger, hence a port of its own rather than evicting it.
+    #
+    # Cert is Tailscale's (Let's Encrypt via the tailnet), shared with that
+    # block. It had already been expired for six weeks when this was added.
+    listen 8443 ssl;
+    server_name @TAILNET_HOST@;
+    ssl_certificate     /etc/nginx/certs/@TAILNET_HOST@.crt;
+    ssl_certificate_key /etc/nginx/certs/@TAILNET_HOST@.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    root /var/www/hls-livecam;
+    index index.html;
+
+    location = /broadcast.txt {
+        etag off;
+        if_modified_since off;
+        add_header Last-Modified "" always;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
+        add_header Pragma "no-cache" always;
+        add_header Access-Control-Allow-Origin "*" always;
+        default_type text/plain;
+    }
+
+    location = /dark.png {
+        etag off;
+        if_modified_since off;
+        add_header Last-Modified "" always;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
+        add_header Pragma "no-cache" always;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location = /cams/cams.json {
+        etag off;
+        if_modified_since off;
+        add_header Last-Modified "" always;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
+        add_header Pragma "no-cache" always;
+        add_header Access-Control-Allow-Origin "*" always;
+        default_type application/json;
+    }
+
+    location /cams {
+        index cams.html;
+        try_files $uri $uri/ =404;
+    }
+
+    # Both spellings, not just the bare root. `/index.html` was falling
+    # through to the default static handler and being served WITH an ETag
+    # and a Last-Modified, so a browser that had ever fetched that URL --
+    # a phone that bookmarked it, anything following a link -- kept showing
+    # a viewer we had already replaced, and the operator was looking at
+    # controls that no longer existed while the server had the new page.
+    location ~ ^/(index\.html)?$ {
+        etag off;
+        if_modified_since off;
+        add_header Last-Modified "" always;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
+        add_header Pragma "no-cache" always;
+        try_files /index.html =404;
+    }
+    location = /buzz.txt {
+        etag off;
+        if_modified_since off;
+        add_header Last-Modified "" always;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
+        add_header Pragma "no-cache" always;
+        add_header Access-Control-Allow-Origin "*" always;
+        default_type text/plain;
+    }
+    # HLS, same-origin. The viewer used to pull the stream straight from
+    # mediamtx on :8888, which is fine over plain http and fatal the moment
+    # the page is served over TLS: an https page may not load an http
+    # stream, so the panel would come up perfectly with no picture in it.
+    # Talkback forces TLS (getUserMedia refuses to run without it), so the
+    # picture has to come through the same door as everything else.
+    location /hls/ {
+        proxy_pass http://127.0.0.1:8888/;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_set_header Host $host;
+        add_header Cache-Control "no-store" always;
+    }
+
+    # WHIP, same-origin. The browser could talk to mediamtx on :8889
+    # directly, and that works right up until the page is served over TLS --
+    # then it is mixed content and the browser blocks it, which is exactly
+    # the setup talkback needs, because getUserMedia refuses to run outside
+    # a secure context in the first place. Proxying it here means the viewer
+    # has one origin whatever it is served over.
+    location /talk/ {
+        proxy_pass http://127.0.0.1:8889/talk/;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_set_header Host $host;
+        proxy_read_timeout 300s;
+    }
+    # WHEP, same-origin, for the two-way INBOUND leg (roomaudio as Opus over
+    # WebRTC). Same reasoning as /talk/ above: proxied here so the viewer has
+    # one origin whether served over http or https, and never hits mixed
+    # content against mediamtx on :8889.
+    location /roomaudio/ {
+        proxy_pass http://127.0.0.1:8889/roomaudio/;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_set_header Host $host;
+        proxy_read_timeout 300s;
+    }
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}

@@ -1,0 +1,13 @@
+[Unit]
+Description=hls-livecam broadcast API
+After=network.target nginx.service
+
+[Service]
+Type=simple
+User=www-data
+ExecStart=/usr/bin/python3 /usr/local/bin/broadcast-api
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

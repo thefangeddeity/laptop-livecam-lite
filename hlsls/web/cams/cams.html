@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Cams online</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
+<style>
+  :root {
+    --bg:         #111113;
+    --panel:      #1c1c1e;
+    --panel-2:    #242426;
+    --border:     #38383a;
+    --text:       #f5f5f7;
+    --text-dim:   #98989d;
+    --text-muted: #6e6e73;
+    --danger:     #ff453a;
+    --warn:       #ff9f0a;
+    --gap:        3px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #000;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #grid {
+    display: grid;
+    width: 100vw;
+    height: 100vh;
+    gap: var(--gap);
+    background: #000;
+    padding: env(safe-area-inset-top,0) env(safe-area-inset-right,0)
+              env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+  }
+  #grid.layout-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  #grid.layout-2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+  #grid.layout-3 { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; }
+  #grid.layout-3 .cell:nth-child(1) { grid-row: 1 / 3; }
+  #grid.layout-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  @media (orientation: portrait) {
+    #grid.layout-2 { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    #grid.layout-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    #grid.layout-3 .cell:nth-child(1) { grid-column: 1 / 3; grid-row: 1; grid-row-end: auto; }
+  }
+  .cell {
+    position: relative;
+    background: var(--bg);
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .cell video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .ph {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px;
+    color: #2a2a2a;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .ph .ph-icon { font-size: 26px; opacity: 0.25; }
+  .ov-top {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%);
+  }
+  .ov-bottom {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 8px 10px;
+    pointer-events: none;
+    background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%);
+  }
+  .cell-clock {
+    font-size: 11px; font-weight: 500;
+    color: rgba(255,255,255,0.75);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.03em;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    transition: all 0.2s;
+  }
+  .live-pill::before {
+    content: '';
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .live-pill.live {
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 10%, var(--panel));
+    border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+  }
+  .live-pill.live::before { background: var(--danger); animation: pulse 1.4s ease-in-out infinite; }
+  .live-pill.reconnecting {
+    color: var(--warn);
+    background: color-mix(in srgb, var(--warn) 10%, var(--panel));
+    border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
+  }
+  .live-pill.reconnecting::before { background: var(--warn); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .cell-msg {
+    font-size: 11px;
+    color: rgba(255,255,255,0.8);
+    letter-spacing: 0.01em;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cell-msg.empty { color: rgba(255,255,255,0.2); font-style: italic; }
+  .drop-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px;
+    background: rgba(0,0,0,0.72);
+    pointer-events: none;
+  }
+  .drop-count {
+    font-size: 48px; font-weight: 700;
+    color: rgba(255,255,255,0.4);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .drop-label {
+    font-size: 11px; letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.2);
+  }
+  #overlay {
+    display: none;
+    position: fixed; inset: 0;
+    z-index: 100;
+    background: #000;
+    cursor: pointer;
+  }
+  #overlay.active { display: block; }
+  #overlay video {
+    width: 100%; height: 100%;
+    object-fit: contain;
+  }
+  #overlay .ov-top,
+  #overlay .ov-bottom { position: absolute; }
+  #close-hint {
+    position: fixed; top: 44px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 101;
+    font-size: 10px; letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.2);
+    text-transform: uppercase;
+    pointer-events: none;
+    display: none;
+  }
+</style>
+</head>
+<body>
+<div id="grid"></div>
+<div id="overlay"></div>
+<div id="close-hint">TAP TO CLOSE</div>
+<script>
+var CONFIG_URL  = '/cams/cams.json';
+var STREAM_PATH = ':8888/cam/index.m3u8';
+var POLL_MS     = 10000;
+var MSG_POLL_MS = 2000;
+
+var activeCells = [];
+var currentPinned = [];
+var droppedIps = {};
+var lastBuiltHash = '';
+var DROP_MS = 16000;
+var maximized   = null;
+var lastHash    = '';
+
+function streamUrl(ip, sp) { return 'http://' + ip + (sp || STREAM_PATH); }
+function msgUrl(ip)    { return 'http://' + ip + '/broadcast.txt'; }
+function configHash(p) { return p.map(function(c){ return c.ip + c.label; }).join('|'); }
+
+function fmtTime() {
+  var n = new Date();
+  return [n.getHours(), n.getMinutes(), n.getSeconds()]
+    .map(function(x){ return String(x).padStart(2,'0'); }).join(':');
+}
+setInterval(function() {
+  document.querySelectorAll('.cell-clock').forEach(function(el){ el.textContent = fmtTime(); });
+}, 1000);
+
+function pollMsg(ip, msgEl) {
+  fetch(msgUrl(ip) + '?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ return r.ok ? r.text() : ''; })
+    .catch(function(){ return ''; })
+    .then(function(t){
+      var msg = t.trim();
+      msgEl.textContent = msg || '\u2014';
+      msgEl.className = 'cell-msg' + (msg ? '' : ' empty');
+    });
+}
+
+function setPill(el, text, cls) {
+  el.textContent = text;
+  el.className = 'live-pill' + (cls ? ' ' + cls : '');
+}
+
+function attachHls(video, ip, pillEl, streamPath, dropCallback) {
+  var dropTimer = null;
+  var url = streamUrl(ip, streamPath);
+  if (Hls.isSupported()) {
+    var hls = new Hls({
+      lowLatencyMode: false, backBufferLength: 4, maxBufferLength: 8,
+      liveSyncDurationCount: 3, enableWorker: true,
+      levelLoadingTimeOut: 12000, fragLoadingTimeOut: 20000,
+      fragLoadingMaxRetry: 8, levelLoadingMaxRetry: 8,
+      fragLoadingRetryDelay: 1000, levelLoadingRetryDelay: 1000,
+    });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, function(){ setPill(pillEl,'BUFFERING',''); video.play().catch(function(){}); });
+    hls.on(Hls.Events.FRAG_LOADED,     function(){ if (dropTimer) { clearTimeout(dropTimer); dropTimer = null; } setPill(pillEl,'LIVE','live'); });
+    hls.on(Hls.Events.ERROR, function(e, data){
+      if (!data.fatal) { setPill(pillEl,'RECONNECTING','reconnecting'); return; }
+      setPill(pillEl,'RECONNECTING','reconnecting');
+      if (dropTimer) return;
+      var cell = activeCells.filter(function(c){ return c.ip === ip; })[0];
+      if (cell) {
+        var do_ = document.createElement('div');
+        do_.className = 'drop-overlay';
+        var dc = document.createElement('div');
+        dc.className = 'drop-count';
+        var dl = document.createElement('div');
+        dl.className = 'drop-label';
+        dl.textContent = 'Searching...';
+        do_.appendChild(dc); do_.appendChild(dl);
+        cell.cell.appendChild(do_);
+        var secs = Math.round(DROP_MS / 1000);
+        dc.textContent = secs;
+        var tick = setInterval(function(){ secs--; dc.textContent = secs > 0 ? secs : ''; }, 1000);
+        dropTimer = setTimeout(function(){
+          clearInterval(tick);
+          if (dropCallback) dropCallback(ip);
+        }, DROP_MS);
+      } else {
+        dropTimer = setTimeout(function(){ if (dropCallback) dropCallback(ip); }, DROP_MS);
+      }
+    });
+    return hls;
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = url;
+    video.play().catch(function(){});
+    video.addEventListener('loadedmetadata', function(){ setPill(pillEl,'LIVE','live'); }, {once:true});
+    return null;
+  }
+  return null;
+}
+
+function destroyAll() {
+  activeCells.forEach(function(c){
+    if (c.hls) c.hls.destroy();
+    if (c.msgTimer) clearInterval(c.msgTimer);
+  });
+  activeCells = [];
+  document.getElementById('grid').innerHTML = '';
+}
+function dropCam(ip) {
+  droppedIps[ip] = true;
+  currentPinned = currentPinned.filter(function(c){ return c.ip !== ip; });
+  buildGrid(currentPinned);
+}
+
+function buildGrid(pinned) {
+  currentPinned = pinned.slice();
+  lastBuiltHash = configHash(pinned);
+  destroyAll();
+  closeOverlay();
+  var grid = document.getElementById('grid');
+  grid.className = 'layout-' + pinned.length;
+
+  pinned.forEach(function(cam, i) {
+    var cell = document.createElement('div');
+    cell.className = 'cell';
+
+    var video = document.createElement('video');
+    video.muted = true; video.autoplay = true; video.playsInline = true;
+    video.setAttribute('playsinline','');
+    cell.appendChild(video);
+
+    var ph = document.createElement('div');
+    ph.className = 'ph';
+    ph.innerHTML = '<div class="ph-icon">\u25CE</div><div>connecting</div>';
+    cell.appendChild(ph);
+    video.addEventListener('playing', function(){ ph.style.display = 'none'; });
+
+    var ovTop = document.createElement('div');
+    ovTop.className = 'ov-top';
+    var clock = document.createElement('div');
+    clock.className = 'cell-clock';
+    clock.textContent = fmtTime();
+    var pill = document.createElement('div');
+    pill.className = 'live-pill';
+    pill.textContent = 'CONNECTING';
+    ovTop.appendChild(clock);
+    ovTop.appendChild(pill);
+    cell.appendChild(ovTop);
+
+    var ovBot = document.createElement('div');
+    ovBot.className = 'ov-bottom';
+    var msgEl = document.createElement('div');
+    msgEl.className = 'cell-msg empty';
+    msgEl.textContent = '\u2014';
+    ovBot.appendChild(msgEl);
+    cell.appendChild(ovBot);
+
+    cell.addEventListener('click', function(){ openOverlay(i); });
+    grid.appendChild(cell);
+
+    var hls = attachHls(video, cam.ip, pill, cam.stream_path, dropCam);
+    pollMsg(cam.ip, msgEl);
+    var msgTimer = setInterval(function(){ pollMsg(cam.ip, msgEl); }, MSG_POLL_MS);
+
+    activeCells.push(Object.assign({}, cam, { video: video, hls: hls, cell: cell, msgTimer: msgTimer }));
+  });
+}
+
+function openOverlay(idx) {
+  if (maximized !== null) { closeOverlay(); return; }
+  var cam = activeCells[idx];
+  var overlay = document.getElementById('overlay');
+
+  var ov = document.createElement('video');
+  ov.muted = true; ov.autoplay = true; ov.playsInline = true;
+  ov.setAttribute('playsinline','');
+
+  var ovTop = document.createElement('div');
+  ovTop.className = 'ov-top';
+  var clock = document.createElement('div');
+  clock.className = 'cell-clock';
+  clock.textContent = fmtTime();
+  var pill = document.createElement('div');
+  pill.className = 'live-pill';
+  pill.textContent = 'CONNECTING';
+  ovTop.appendChild(clock); ovTop.appendChild(pill);
+
+  var ovBot = document.createElement('div');
+  ovBot.className = 'ov-bottom';
+  var msgEl = document.createElement('div');
+  msgEl.className = 'cell-msg empty';
+  msgEl.textContent = '\u2014';
+  ovBot.appendChild(msgEl);
+
+  overlay.innerHTML = '';
+  overlay.appendChild(ov);
+  overlay.appendChild(ovTop);
+  overlay.appendChild(ovBot);
+  overlay.classList.add('active');
+
+  overlay._hls = attachHls(ov, cam.ip, pill, cam.stream_path);
+  overlay._clockTick = setInterval(function(){ clock.textContent = fmtTime(); }, 1000);
+  overlay._msgTimer  = setInterval(function(){ pollMsg(cam.ip, msgEl); }, MSG_POLL_MS);
+  pollMsg(cam.ip, msgEl);
+
+  maximized = idx;
+  document.getElementById('close-hint').style.display = 'block';
+}
+
+function closeOverlay() {
+  var overlay = document.getElementById('overlay');
+  if (overlay._hls)       { overlay._hls.destroy();       overlay._hls = null; }
+  if (overlay._clockTick) { clearInterval(overlay._clockTick); overlay._clockTick = null; }
+  if (overlay._msgTimer)  { clearInterval(overlay._msgTimer);  overlay._msgTimer  = null; }
+  overlay.classList.remove('active');
+  overlay.innerHTML = '';
+  maximized = null;
+  document.getElementById('close-hint').style.display = 'none';
+}
+
+document.getElementById('overlay').addEventListener('click', closeOverlay);
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeOverlay(); });
+
+async function loadConfig() {
+  try {
+    var r = await fetch(CONFIG_URL + '?t=' + Date.now());
+    if (!r.ok) throw new Error(r.status);
+    var data   = await r.json();
+    var pinned = data.filter(function(c){ return c.pinned && c.ip; });
+    if (!pinned.length) { destroyAll(); return; }
+    var h = configHash(pinned);
+    if (h !== lastHash) {
+      droppedIps = {};
+      lastHash = h;
+      buildGrid(pinned);
+    } else {
+      var visible = pinned.filter(function(c){ return !droppedIps[c.ip]; });
+      var vh = configHash(visible);
+      if (vh !== lastBuiltHash) { buildGrid(visible); }
+    }
+  } catch(e) {}
+}
+
+loadConfig();
+setInterval(loadConfig, POLL_MS);
+
+document.addEventListener('DOMContentLoaded', function() {
+  var tapGate = document.getElementById('tap-gate');
+  tapGate.style.display = 'flex';
+  tapGate.addEventListener('click', function() {
+    tapGate.style.display = 'none';
+    activeCells.forEach(function(c){ if (c.video) c.video.play().catch(function(){}); });
+  }, {once: true});
+});
+</script>
+<style>
+  #tap-gate { display:none; position:fixed; inset:0; z-index:9999; background:#000; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#f5f5f7; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  #tap-gate-icon { font-size:52px; opacity:0.85; }
+  #tap-gate-name { font-size:17px; font-weight:600; letter-spacing:0.02em; }
+  #tap-gate-license { font-size:11px; color:#6e6e73; letter-spacing:0.08em; text-transform:uppercase; }
+  #tap-gate-hint { font-size:13px; color:#98989d; margin-top:6px; }
+</style>
+<div id="tap-gate">
+  <div id="tap-gate-icon">▶</div>
+  <div id="tap-gate-name">HLS Livecam v5.0.15</div>
+  <div id="tap-gate-license">GPL 3.0</div>
+  <div id="tap-gate-hint">Tap to play</div>
+</div>
+</body>
+</html>

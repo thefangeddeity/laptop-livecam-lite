@@ -1,0 +1,17 @@
+[Unit]
+Description=hls-livecam -- the livecam's services, together
+# One switch for the whole livecam (camdash --start / --yield / --status).
+# Its members are the livecam services this host enabled at boot -- mediamtx
+# and broadcast-api everywhere, ffmpeg-cam where it does the capture --
+# moved under this target by hls-livecam-suite (hls-livecam.target.wants/),
+# each PartOf it by a drop-in: stopping the target stops them all, and
+# whether the livecam comes back after a reboot is one question: is this
+# target enabled?
+# The camera suite: the livecam and cambrian-perception share the camera and
+# never run together -- starting either stops the other. cambrian.target
+# declares the same; either declaration alone is enough, and naming a unit
+# that isn't installed is harmless.
+Conflicts=cambrian.target
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELE Messenger</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Tahoma, Arial, sans-serif; background: #1e4d8c; height: 100vh; display: flex; align-items: center; justify-content: center; }
+#login { background: #f0f0f0; border: 2px solid #0066cc; border-radius: 4px; padding: 24px; width: 300px; text-align: center; }
+#login h1 { color: #1e4d8c; font-size: 18px; margin-bottom: 16px; }
+#login input { width: 100%; padding: 6px 8px; margin-bottom: 10px; border: 1px solid #aaa; border-radius: 2px; font-size: 13px; }
+#login button { background: #1e4d8c; color: white; border: none; padding: 7px 24px; border-radius: 2px; cursor: pointer; font-size: 13px; }
+#login button:hover { background: #0066cc; }
+#app { display: none; width: 100vw; height: 100vh; background: #fff; flex-direction: column; }
+#titlebar { background: linear-gradient(to bottom, #4a9fff, #1e4d8c); color: white; padding: 4px 8px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+#titlebar .dot { width: 8px; height: 8px; border-radius: 50%; background: #7fff00; display: inline-block; }
+#main { display: flex; flex: 1; overflow: hidden; }
+#sidebar { width: 200px; border-right: 1px solid #ccc; background: #f5f5f5; display: flex; flex-direction: column; }
+#sidebar h3 { background: #1e4d8c; color: white; padding: 6px 10px; font-size: 12px; }
+#online-list { flex: 1; overflow-y: auto; padding: 4px; }
+.user-item { padding: 6px 8px; cursor: pointer; border-radius: 2px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.user-item:hover { background: #dde9ff; }
+.user-item.active { background: #c5d9f1; }
+.user-item::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #7fff00; display: inline-block; flex-shrink: 0; }
+#chatarea { flex: 1; display: flex; flex-direction: column; }
+#chat-header { background: #dde9ff; border-bottom: 1px solid #99b4d1; padding: 6px 10px; font-size: 13px; color: #1e4d8c; font-weight: bold; }
+#messages { flex: 1; overflow-y: auto; padding: 10px; background: white; }
+.msg { margin-bottom: 8px; font-size: 13px; }
+.msg .who { font-weight: bold; color: #1e4d8c; }
+.msg.me .who { color: #cc6600; }
+.msg .text { margin-left: 4px; }
+.msg .time { color: #999; font-size: 11px; margin-left: 6px; }
+#inputrow { display: flex; border-top: 1px solid #ccc; padding: 6px; gap: 6px; background: #f5f5f5; }
+#to-input { width: 90px; padding: 4px 6px; border: 1px solid #aaa; border-radius: 2px; font-size: 13px; }
+#msg-input { flex: 1; padding: 4px 6px; border: 1px solid #aaa; border-radius: 2px; font-size: 13px; }
+#send-btn { background: #1e4d8c; color: white; border: none; padding: 4px 14px; border-radius: 2px; cursor: pointer; font-size: 13px; }
+#send-btn:hover { background: #0066cc; }
+#status { font-size: 11px; color: #666; padding: 3px 10px; background: #eee; border-top: 1px solid #ccc; }
+.sys { color: #999; font-style: italic; font-size: 12px; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div id="login">
+  <h1>ELE Messenger</h1>
+  <input id="name-input" placeholder="Your name" maxlength="32" />
+  <button onclick="connect()">Sign In</button>
+</div>
+<div id="app">
+  <div id="titlebar"><span class="dot"></span><span id="title-name">ELE Messenger</span></div>
+  <div id="main">
+    <div id="sidebar">
+      <h3>Online</h3>
+      <div id="online-list"></div>
+    </div>
+    <div id="chatarea">
+      <div id="chat-header">Select a contact to chat</div>
+      <div id="messages"></div>
+      <div id="inputrow">
+        <input id="to-input" placeholder="To" />
+        <input id="msg-input" placeholder="Type a message..." />
+        <button id="send-btn" onclick="send()">Send</button>
+      </div>
+    </div>
+  </div>
+  <div id="status">Connecting...</div>
+</div>
+<script>
+let ws, me, pollInterval;
+const SERVER = location.hostname;
+
+function connect() {
+  me = document.getElementById('name-input').value.trim();
+  if (!me) return;
+  ws = new WebSocket('ws://' + SERVER + '/ele-ws/' + encodeURIComponent(me));
+  ws.onopen = () => {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('title-name').textContent = 'ELE Messenger — ' + me;
+    document.getElementById('status').textContent = 'Connected as ' + me;
+    pollOnline();
+    pollInterval = setInterval(pollOnline, 3000);
+  };
+  ws.onmessage = e => {
+    const d = JSON.parse(e.data);
+    addMsg(d.from, d.message, false);
+    if (document.getElementById('to-input').value === '') {
+      document.getElementById('to-input').value = d.from;
+    }
+  };
+  ws.onclose = () => {
+    document.getElementById('status').textContent = 'Disconnected';
+    clearInterval(pollInterval);
+  };
+  ws.onerror = () => document.getElementById('status').textContent = 'Connection error';
+}
+
+function send() {
+  const to = document.getElementById('to-input').value.trim();
+  const msg = document.getElementById('msg-input').value.trim();
+  if (!to || !msg || !ws) return;
+  ws.send(JSON.stringify({to, message: msg}));
+  addMsg(me, msg, true);
+  document.getElementById('msg-input').value = '';
+  document.getElementById('chat-header').textContent = 'Chat with ' + to;
+}
+
+function addMsg(from, text, isMe) {
+  const box = document.getElementById('messages');
+  const d = document.createElement('div');
+  d.className = 'msg' + (isMe ? ' me' : '');
+  const t = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  d.innerHTML = '<span class="who">' + from + '</span><span class="text">' + escHtml(text) + '</span><span class="time">' + t + '</span>';
+  box.appendChild(d);
+  box.scrollTop = box.scrollHeight;
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function pollOnline() {
+  fetch('/ele-api/online').then(r => r.json()).then(d => {
+    const list = document.getElementById('online-list');
+    list.innerHTML = '';
+    (d.online || []).forEach(u => {
+      if (u === me) return;
+      const el = document.createElement('div');
+      el.className = 'user-item';
+      el.textContent = u;
+      el.onclick = () => {
+        document.getElementById('to-input').value = u;
+        document.getElementById('chat-header').textContent = 'Chat with ' + u;
+        document.querySelectorAll('.user-item').forEach(x => x.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('msg-input').focus();
+      };
+      list.appendChild(el);
+    });
+    if (!d.online || d.online.filter(u => u !== me).length === 0) {
+      list.innerHTML = '<div style="padding:8px;font-size:12px;color:#999">Nobody else online</div>';
+    }
+  }).catch(() => {});
+}
+
+document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+document.getElementById('msg-input').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+</script>
+</body>
+</html>

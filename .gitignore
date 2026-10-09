@@ -24,3 +24,9 @@ cv/models/*.onnx
 # Cross-vendor scratch (hive architecture) -- ephemeral by design, never
 # versioned. See inserver/README.md.
 aibridge/
+
+# Node identity. This repo is PUBLIC; these name a private tailnet and the
+# machines on it. Templates (*.in) carry @TAILNET_HOST@ and deploy.sh fills
+# it from node.env at install time.
+hlsls/node.env
+hlsls/web/cams/cams.json
